@@ -57,6 +57,10 @@
 
 #include "scancontext/Scancontext.h"
 
+#include "std_msgs/String.h"
+
+#include "std_msgs/Int8.h"
+
 using namespace gtsam;
 
 using std::cout;
@@ -68,6 +72,8 @@ double translationAccumulated = 1000000.0; // large value means must add the fir
 double rotaionAccumulated = 1000000.0; // large value means must add the first given frame.
 
 bool isNowKeyFrame = false; 
+
+int loop_detected_dummy = 0;
 
 Pose6D odom_pose_prev {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // init 
 Pose6D odom_pose_curr {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // init pose is zero 
@@ -126,8 +132,9 @@ double recentOptimizedX = 0.0;
 double recentOptimizedY = 0.0;
 
 ros::Publisher pubMapAftPGO, pubOdomAftPGO, pubPathAftPGO;
-ros::Publisher pubLoopScanLocal, pubLoopSubmapLocal;
-ros::Publisher pubOdomRepubVerifier;
+ros::Publisher pubLoopDetected;
+//ros::Publisher pubLoopScanLocal, pubLoopSubmapLocal;
+//ros::Publisher pubOdomRepubVerifier;
 
 std::string save_directory;
 std::string pgKITTIformat, pgScansDirectory, pgSCDsDirectory;
@@ -362,7 +369,7 @@ void pubPath( void )
     // pub odom and path 
     nav_msgs::Odometry odomAftPGO;
     nav_msgs::Path pathAftPGO;
-    pathAftPGO.header.frame_id = "/camera_init";
+    pathAftPGO.header.frame_id = "aloam_map";
     mKF.lock(); 
     // for (int node_idx=0; node_idx < int(keyframePosesUpdated.size()) - 1; node_idx++) // -1 is just delayed visualization (because sometimes mutexed while adding(push_back) a new one)
     for (int node_idx=0; node_idx < recentIdxUpdated; node_idx++) // -1 is just delayed visualization (because sometimes mutexed while adding(push_back) a new one)
@@ -371,7 +378,7 @@ void pubPath( void )
         // const gtsam::Pose3& pose_est = isamCurrentEstimate.at<gtsam::Pose3>(node_idx);
 
         nav_msgs::Odometry odomAftPGOthis;
-        odomAftPGOthis.header.frame_id = "/camera_init";
+        odomAftPGOthis.header.frame_id = "aloam_map";
         odomAftPGOthis.child_frame_id = "/aft_pgo";
         odomAftPGOthis.header.stamp = ros::Time().fromSec(keyframeTimes.at(node_idx));
         odomAftPGOthis.pose.pose.position.x = pose_est.x;
@@ -385,7 +392,7 @@ void pubPath( void )
         poseStampAftPGO.pose = odomAftPGOthis.pose.pose;
 
         pathAftPGO.header.stamp = odomAftPGOthis.header.stamp;
-        pathAftPGO.header.frame_id = "/camera_init";
+        pathAftPGO.header.frame_id = "aloam_map";
         pathAftPGO.poses.push_back(poseStampAftPGO);
     }
     mKF.unlock(); 
@@ -401,7 +408,7 @@ void pubPath( void )
     q.setY(odomAftPGO.pose.pose.orientation.y);
     q.setZ(odomAftPGO.pose.pose.orientation.z);
     transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, odomAftPGO.header.stamp, "/camera_init", "/aft_pgo"));
+    br.sendTransform(tf::StampedTransform(transform, odomAftPGO.header.stamp, "aloam_map", "/aft_pgo"));
 } // pubPath
 
 void updatePoses(void)
@@ -505,13 +512,13 @@ std::optional<gtsam::Pose3> doICPVirtualRelative( int _loop_kf_idx, int _curr_kf
     // loop verification 
     sensor_msgs::PointCloud2 cureKeyframeCloudMsg;
     pcl::toROSMsg(*cureKeyframeCloud, cureKeyframeCloudMsg);
-    cureKeyframeCloudMsg.header.frame_id = "/camera_init";
-    pubLoopScanLocal.publish(cureKeyframeCloudMsg);
+    cureKeyframeCloudMsg.header.frame_id = "aloam_map";
+    //pubLoopScanLocal.publish(cureKeyframeCloudMsg);
 
     sensor_msgs::PointCloud2 targetKeyframeCloudMsg;
     pcl::toROSMsg(*targetKeyframeCloud, targetKeyframeCloudMsg);
-    targetKeyframeCloudMsg.header.frame_id = "/camera_init";
-    pubLoopSubmapLocal.publish(targetKeyframeCloudMsg);
+    targetKeyframeCloudMsg.header.frame_id = "aloam_map";
+    //pubLoopSubmapLocal.publish(targetKeyframeCloudMsg);
 
     // ICP Settings
     pcl::IterativeClosestPoint<PointType, PointType> icp;
@@ -717,10 +724,17 @@ void performSCLoopClosure(void)
     auto detectResult = scManager.detectLoopClosureID(); // first: nn index, second: yaw diff 
     int SCclosestHistoryFrameID = detectResult.first;
     if( SCclosestHistoryFrameID != -1 ) { 
+        //std_msgs::String loop_detected_msg; /////////////////////////////////////////////////////////////////////////////////////////////////
         const int prev_node_idx = SCclosestHistoryFrameID;
         const int curr_node_idx = keyframePoses.size() - 1; // because cpp starts 0 and ends n-1
         cout << "Loop detected! - between " << prev_node_idx << " and " << curr_node_idx << "" << endl;
-
+        //loop_detected_msg.data = "Loop detected";  //////////////////////
+        if (prev_node_idx<10){
+            //loop_detected_dummy = 1;
+            std_msgs::Int8 loop_detected_flag;
+            loop_detected_flag.data = 1;
+            pubLoopDetected.publish(loop_detected_flag);
+        }
         mBuf.lock();
         scLoopICPBuf.push(std::pair<int, int>(prev_node_idx, curr_node_idx));
         // addding actual 6D constraints in the other thread, icp_calculation.
@@ -827,7 +841,7 @@ void pubMap(void)
 
     sensor_msgs::PointCloud2 laserCloudMapPGOMsg;
     pcl::toROSMsg(*laserCloudMapPGO, laserCloudMapPGOMsg);
-    laserCloudMapPGOMsg.header.frame_id = "/camera_init";
+    laserCloudMapPGOMsg.header.frame_id = "aloam_map";
     pubMapAftPGO.publish(laserCloudMapPGOMsg);
 }
 
@@ -844,14 +858,15 @@ void process_viz_map(void)
 } // pointcloud_viz
 
 
+
 int main(int argc, char **argv)
 {
-	ros::init(argc, argv, "laserPGO");
+	ros::init(argc, argv, "/aloam/laserPGO");
 	ros::NodeHandle nh;
 
     // save directories 
-	nh.param<std::string>("save_directory", save_directory, "/"); // pose assignment every k m move 
-
+	nh.param<std::string>("/aloam/save_directory", save_directory, "/"); // pose assignment every k m move 
+    
     pgKITTIformat = save_directory + "optimized_poses.txt";
     odomKITTIformat = save_directory + "odom_poses.txt";
 
@@ -869,12 +884,12 @@ int main(int argc, char **argv)
     unused = system((std::string("mkdir -p ") + pgSCDsDirectory).c_str());
 
     // system params 
-	nh.param<double>("keyframe_meter_gap", keyframeMeterGap, 2.0); // pose assignment every k m move 
-	nh.param<double>("keyframe_deg_gap", keyframeDegGap, 10.0); // pose assignment every k deg rot 
+	nh.param<double>("/aloam/keyframe_meter_gap", keyframeMeterGap, 2.0); // pose assignment every k m move 
+	nh.param<double>("/aloam/keyframe_deg_gap", keyframeDegGap, 10.0); // pose assignment every k deg rot 
     keyframeRadGap = deg2rad(keyframeDegGap);
 
-	nh.param<double>("sc_dist_thres", scDistThres, 0.2);  
-	nh.param<double>("sc_max_radius", scMaximumRadius, 80.0); // 80 is recommended for outdoor, and lower (ex, 20, 40) values are recommended for indoor 
+	nh.param<double>("/aloam/sc_dist_thres", scDistThres, 0.2);  
+	nh.param<double>("/aloam/sc_max_radius", scMaximumRadius, 80.0); // 80 is recommended for outdoor, and lower (ex, 20, 40) values are recommended for indoor 
 
     ISAM2Params parameters;
     parameters.relinearizeThreshold = 0.01;
@@ -890,20 +905,29 @@ int main(int argc, char **argv)
     downSizeFilterICP.setLeafSize(filter_size, filter_size, filter_size);
 
     double mapVizFilterSize;
-	nh.param<double>("mapviz_filter_size", mapVizFilterSize, 0.4); // pose assignment every k frames 
+	nh.param<double>("/aloam/mapviz_filter_size", mapVizFilterSize, 0.4); // pose assignment every k frames 
     downSizeFilterMapPGO.setLeafSize(mapVizFilterSize, mapVizFilterSize, mapVizFilterSize);
 
-	ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_cloud_registered_local", 100, laserCloudFullResHandler);
-	ros::Subscriber subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("/aft_mapped_to_init", 100, laserOdometryHandler);
-	ros::Subscriber subGPS = nh.subscribe<sensor_msgs::NavSatFix>("/gps/fix", 100, gpsHandler);
+	ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("/aloam/velodyne_cloud_registered_local", 100, laserCloudFullResHandler);
+	ros::Subscriber subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("/aloam/aft_mapped_to_init", 100, laserOdometryHandler);
+	//ros::Subscriber subGPS = nh.subscribe<sensor_msgs::NavSatFix>("/gps/fix", 100, gpsHandler);
 
-	pubOdomAftPGO = nh.advertise<nav_msgs::Odometry>("/aft_pgo_odom", 100);
-	pubOdomRepubVerifier = nh.advertise<nav_msgs::Odometry>("/repub_odom", 100);
-	pubPathAftPGO = nh.advertise<nav_msgs::Path>("/aft_pgo_path", 100);
-	pubMapAftPGO = nh.advertise<sensor_msgs::PointCloud2>("/aft_pgo_map", 100);
+	pubOdomAftPGO = nh.advertise<nav_msgs::Odometry>("/aloam/aft_pgo_odom", 100);
+	//pubOdomRepubVerifier = nh.advertise<nav_msgs::Odometry>("/repub_odom", 100);
+	pubPathAftPGO = nh.advertise<nav_msgs::Path>("/aloam/aft_pgo_path", 100);
+	pubMapAftPGO = nh.advertise<sensor_msgs::PointCloud2>("/aloam/aft_pgo_map", 100);
 
-	pubLoopScanLocal = nh.advertise<sensor_msgs::PointCloud2>("/loop_scan_local", 100);
-	pubLoopSubmapLocal = nh.advertise<sensor_msgs::PointCloud2>("/loop_submap_local", 100);
+
+    
+
+	//pubLoopScanLocal = nh.advertise<sensor_msgs::PointCloud2>("/loop_scan_local", 100);
+	//pubLoopSubmapLocal = nh.advertise<sensor_msgs::PointCloud2>("/loop_submap_local", 100);
+    //pubLoopDetected = nh.advertise<std_msgs::String>("/loop_detected", 100);
+    pubLoopDetected = nh.advertise<std_msgs::Int8>("/aloam/loop_detected", 100);
+    //loop_detected_flag.data=0;
+    //loop_detected_dummy = 0;
+    
+
 
 	std::thread posegraph_slam {process_pg}; // pose graph construction
 	std::thread lc_detection {process_lcd}; // loop closure detection 

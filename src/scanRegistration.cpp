@@ -41,7 +41,7 @@
 #include "aloam_velodyne/common.h"
 #include "aloam_velodyne/tic_toc.h"
 #include <nav_msgs/Odometry.h>
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -58,6 +58,7 @@ using std::cos;
 using std::sin;
 
 std::string LIDAR_TYPE;
+std::string LIDAR_TOPIC;
 
 const double scanPeriod = 0.1;
 
@@ -426,31 +427,31 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     sensor_msgs::PointCloud2 laserCloudOutMsg;
     pcl::toROSMsg(*laserCloud, laserCloudOutMsg);
     laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
-    laserCloudOutMsg.header.frame_id = "/camera_init";
+    laserCloudOutMsg.header.frame_id = "aloam_map";
     pubLaserCloud.publish(laserCloudOutMsg);
 
     sensor_msgs::PointCloud2 cornerPointsSharpMsg;
     pcl::toROSMsg(cornerPointsSharp, cornerPointsSharpMsg);
     cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
-    cornerPointsSharpMsg.header.frame_id = "/camera_init";
+    cornerPointsSharpMsg.header.frame_id = "aloam_map";
     pubCornerPointsSharp.publish(cornerPointsSharpMsg);
 
     sensor_msgs::PointCloud2 cornerPointsLessSharpMsg;
     pcl::toROSMsg(cornerPointsLessSharp, cornerPointsLessSharpMsg);
     cornerPointsLessSharpMsg.header.stamp = laserCloudMsg->header.stamp;
-    cornerPointsLessSharpMsg.header.frame_id = "/camera_init";
+    cornerPointsLessSharpMsg.header.frame_id = "aloam_map";
     pubCornerPointsLessSharp.publish(cornerPointsLessSharpMsg);
 
     sensor_msgs::PointCloud2 surfPointsFlat2;
     pcl::toROSMsg(surfPointsFlat, surfPointsFlat2);
     surfPointsFlat2.header.stamp = laserCloudMsg->header.stamp;
-    surfPointsFlat2.header.frame_id = "/camera_init";
+    surfPointsFlat2.header.frame_id = "aloam_map";
     pubSurfPointsFlat.publish(surfPointsFlat2);
 
     sensor_msgs::PointCloud2 surfPointsLessFlat2;
     pcl::toROSMsg(surfPointsLessFlat, surfPointsLessFlat2);
     surfPointsLessFlat2.header.stamp = laserCloudMsg->header.stamp;
-    surfPointsLessFlat2.header.frame_id = "/camera_init";
+    surfPointsLessFlat2.header.frame_id = "aloam_map";
     pubSurfPointsLessFlat.publish(surfPointsLessFlat2);
     // std::cout << "published ... " << std::endl;
 
@@ -462,7 +463,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             sensor_msgs::PointCloud2 scanMsg;
             pcl::toROSMsg(laserCloudScans[i], scanMsg);
             scanMsg.header.stamp = laserCloudMsg->header.stamp;
-            scanMsg.header.frame_id = "/camera_init";
+            scanMsg.header.frame_id = "aloam_map";
             pubEachScan[i].publish(scanMsg);
         }
     }
@@ -474,12 +475,13 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "scanRegistration");
+    ros::init(argc, argv, "/aloam/scanRegistration");
     ros::NodeHandle nh;
 
-    nh.param<int>("scan_line", N_SCANS, 16);
-    nh.param<std::string>("lidar_type", LIDAR_TYPE, "KITTI");
-    nh.param<double>("minimum_range", MINIMUM_RANGE, 0.1);
+    nh.param<int>("/aloam/scan_line", N_SCANS, 16);
+    nh.param<std::string>("/aloam/lidar_type", LIDAR_TYPE, "KITTI");
+    nh.param<double>("/aloam/minimum_range", MINIMUM_RANGE, 0.1);
+    nh.param<std::string>("/aloam/lidar_topic", LIDAR_TOPIC, "/none");
 
     //printf("scan line number %d \n", N_SCANS);
 
@@ -489,25 +491,25 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudHandler);
+    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(LIDAR_TOPIC, 100, laserCloudHandler);
 
-    pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);
+    pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/aloam/velodyne_cloud_2", 100);
 
-    pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 100);
+    pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>("/aloam/laser_cloud_sharp", 100);
 
-    pubCornerPointsLessSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 100);
+    pubCornerPointsLessSharp = nh.advertise<sensor_msgs::PointCloud2>("/aloam/laser_cloud_less_sharp", 100);
 
-    pubSurfPointsFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_flat", 100);
+    pubSurfPointsFlat = nh.advertise<sensor_msgs::PointCloud2>("/aloam/laser_cloud_flat", 100);
 
-    pubSurfPointsLessFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 100);
+    pubSurfPointsLessFlat = nh.advertise<sensor_msgs::PointCloud2>("/aloam/laser_cloud_less_flat", 100);
 
-    pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_remove_points", 100);
+    pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/aloam/laser_remove_points", 100);
 
     if(PUB_EACH_LINE)
     {
         for(int i = 0; i < N_SCANS; i++)
         {
-            ros::Publisher tmp = nh.advertise<sensor_msgs::PointCloud2>("/laser_scanid_" + std::to_string(i), 100);
+            ros::Publisher tmp = nh.advertise<sensor_msgs::PointCloud2>("/aloam/laser_scanid_" + std::to_string(i), 100);
             pubEachScan.push_back(tmp);
         }
     }

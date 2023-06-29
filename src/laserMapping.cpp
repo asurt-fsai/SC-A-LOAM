@@ -62,6 +62,7 @@
 #include "aloam_velodyne/common.h"
 #include "aloam_velodyne/tic_toc.h"
 
+std::string lidarFrame;
 
 int frameCount = 0;
 
@@ -216,8 +217,8 @@ void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr &laserOdometry)
 	Eigen::Vector3d t_w_curr = q_wmap_wodom * t_wodom_curr + t_wmap_wodom; 
 
 	nav_msgs::Odometry odomAftMapped;
-	odomAftMapped.header.frame_id = "/camera_init";
-	odomAftMapped.child_frame_id = "/aft_mapped";
+	odomAftMapped.header.frame_id = "aloam_map";
+	odomAftMapped.child_frame_id = lidarFrame;
 	odomAftMapped.header.stamp = laserOdometry->header.stamp;
 	odomAftMapped.pose.pose.orientation.x = q_w_curr.x();
 	odomAftMapped.pose.pose.orientation.y = q_w_curr.y();
@@ -817,7 +818,7 @@ void process()
 				sensor_msgs::PointCloud2 laserCloudSurround3;
 				pcl::toROSMsg(*laserCloudSurround, laserCloudSurround3);
 				laserCloudSurround3.header.stamp = ros::Time().fromSec(timeLaserOdometry);
-				laserCloudSurround3.header.frame_id = "/camera_init";
+				laserCloudSurround3.header.frame_id = "aloam_map";
 				pubLaserCloudSurround.publish(laserCloudSurround3);
 			}
 
@@ -832,14 +833,14 @@ void process()
 				sensor_msgs::PointCloud2 laserCloudMsg;
 				pcl::toROSMsg(laserCloudMap, laserCloudMsg);
 				laserCloudMsg.header.stamp = ros::Time().fromSec(timeLaserOdometry);
-				laserCloudMsg.header.frame_id = "/camera_init";
+				laserCloudMsg.header.frame_id = "aloam_map";
 				pubLaserCloudMap.publish(laserCloudMsg);
 			}
 
 			sensor_msgs::PointCloud2 laserCloudFullRes3Local;
 			pcl::toROSMsg(*laserCloudFullRes, laserCloudFullRes3Local);
 			laserCloudFullRes3Local.header.stamp = ros::Time().fromSec(timeLaserOdometry);
-			laserCloudFullRes3Local.header.frame_id = "/camera_init";
+			laserCloudFullRes3Local.header.frame_id = "aloam_map";
 			pubLaserCloudFullResLocal.publish(laserCloudFullRes3Local);
 
 			int laserCloudFullResNum = laserCloudFullRes->points.size();
@@ -851,7 +852,7 @@ void process()
 			sensor_msgs::PointCloud2 laserCloudFullRes3;
 			pcl::toROSMsg(*laserCloudFullRes, laserCloudFullRes3);
 			laserCloudFullRes3.header.stamp = ros::Time().fromSec(timeLaserOdometry);
-			laserCloudFullRes3.header.frame_id = "/camera_init";
+			laserCloudFullRes3.header.frame_id = "aloam_map";
 			pubLaserCloudFullRes.publish(laserCloudFullRes3);
 
 			//printf("mapping pub time %f ms \n", t_pub.toc());
@@ -859,8 +860,8 @@ void process()
 			//printf("whole mapping time %f ms ++++++++++\n", t_whole.toc());
 
 			nav_msgs::Odometry odomAftMapped;
-			odomAftMapped.header.frame_id = "/camera_init";
-			odomAftMapped.child_frame_id = "/aft_mapped";
+			odomAftMapped.header.frame_id = "aloam_map";
+			odomAftMapped.child_frame_id = lidarFrame;
 			odomAftMapped.header.stamp = ros::Time().fromSec(timeLaserOdometry);
 			odomAftMapped.pose.pose.orientation.x = q_w_curr.x();
 			odomAftMapped.pose.pose.orientation.y = q_w_curr.y();
@@ -881,7 +882,7 @@ void process()
 			laserAfterMappedPose.pose = odomAftMapped.pose.pose;
 
 			laserAfterMappedPath.header.stamp = odomAftMapped.header.stamp;
-			laserAfterMappedPath.header.frame_id = "/camera_init";
+			laserAfterMappedPath.header.frame_id = "aloam_map";
 			laserAfterMappedPath.poses.push_back(laserAfterMappedPose);
 			pubLaserAfterMappedPath.publish(laserAfterMappedPath);
 
@@ -896,7 +897,7 @@ void process()
 			q.setY(q_w_curr.y());
 			q.setZ(q_w_curr.z());
 			transform.setRotation(q);
-			br.sendTransform(tf::StampedTransform(transform, odomAftMapped.header.stamp, "/camera_init", "/aft_mapped"));
+			br.sendTransform(tf::StampedTransform(transform, odomAftMapped.header.stamp, "aloam_map", lidarFrame));
 
 			frameCount++;
 		}
@@ -907,37 +908,38 @@ void process()
 
 int main(int argc, char **argv)
 {
-	ros::init(argc, argv, "laserMapping");
+	ros::init(argc, argv, "/aloam/laserMapping");
 	ros::NodeHandle nh;
 
 	float lineRes = 0;
 	float planeRes = 0;
-	nh.param<float>("mapping_line_resolution", lineRes, 0.4);
-	nh.param<float>("mapping_plane_resolution", planeRes, 0.8);
+	nh.param<float>("/aloam/mapping_line_resolution", lineRes, 0.4);
+	nh.param<float>("/aloam/mapping_plane_resolution", planeRes, 0.8);
+	nh.param<std::string>("/aloam/lidar_frame", lidarFrame, "lidarFrame");
 	//printf("line resolution %f plane resolution %f \n", lineRes, planeRes);
 	downSizeFilterCorner.setLeafSize(lineRes, lineRes,lineRes);
 	downSizeFilterSurf.setLeafSize(planeRes, planeRes, planeRes);
 
-	ros::Subscriber subLaserCloudCornerLast = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_corner_last", 100, laserCloudCornerLastHandler);
+	ros::Subscriber subLaserCloudCornerLast = nh.subscribe<sensor_msgs::PointCloud2>("/aloam/laser_cloud_corner_last", 100, laserCloudCornerLastHandler);
 
-	ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_surf_last", 100, laserCloudSurfLastHandler);
+	ros::Subscriber subLaserCloudSurfLast = nh.subscribe<sensor_msgs::PointCloud2>("/aloam/laser_cloud_surf_last", 100, laserCloudSurfLastHandler);
 
-	ros::Subscriber subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("/laser_odom_to_init", 100, laserOdometryHandler);
+	ros::Subscriber subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("/aloam/laser_odom_to_init", 100, laserOdometryHandler);
 
-	ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_cloud_3", 100, laserCloudFullResHandler);
+	ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("/aloam/velodyne_cloud_3", 100, laserCloudFullResHandler);
 
-	pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surround", 100);
+	pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>("/aloam/laser_cloud_surround", 100);
 
-	pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_map", 100);
+	pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>("/aloam/laser_cloud_map", 100);
 
-	pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_registered", 100);
-	pubLaserCloudFullResLocal = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_registered_local", 100);
+	pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>("/aloam/velodyne_cloud_registered", 100);
+	pubLaserCloudFullResLocal = nh.advertise<sensor_msgs::PointCloud2>("/aloam/velodyne_cloud_registered_local", 100);
 
-	pubOdomAftMapped = nh.advertise<nav_msgs::Odometry>("/aft_mapped_to_init", 100);
+	pubOdomAftMapped = nh.advertise<nav_msgs::Odometry>("/aloam/aft_mapped_to_init", 100);
 
-	pubOdomAftMappedHighFrec = nh.advertise<nav_msgs::Odometry>("/aft_mapped_to_init_high_frec", 100);
+	pubOdomAftMappedHighFrec = nh.advertise<nav_msgs::Odometry>("/aloam/aft_mapped_to_init_high_frec", 100);
 
-	pubLaserAfterMappedPath = nh.advertise<nav_msgs::Path>("/aft_mapped_path", 100);
+	pubLaserAfterMappedPath = nh.advertise<nav_msgs::Path>("/aloam/aft_mapped_path", 100);
 
 	for (int i = 0; i < laserCloudNum; i++)
 	{
