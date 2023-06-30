@@ -26,12 +26,12 @@
     <!-- utils -->
     <param name="/aloam/save_directory" type="string" value="$(find slam_manager)/data/latest/"/>  <!-- CHANGE THIS and end with / -->
 	
-    <node pkg="aloam_velodyne" type="ascanRegistration" name="ascanRegistration" ns="/aloam" output="screen" />
-    <node pkg="aloam_velodyne" type="alaserOdometry" name="alaserOdometry" ns="/aloam" output="screen" />
-    <node pkg="aloam_velodyne" type="alaserMapping" name="alaserMapping" ns="/aloam" output="screen" />
-    <node pkg="aloam_velodyne" type="alaserPGO" name="alaserPGO" ns="/aloam" output="screen" /> <!-- SC-A-LOAM -->
+    <node pkg="aloam_velodyne" type="ascanRegistration" name="ascanRegistration" ns="/aloam"/>
+    <node pkg="aloam_velodyne" type="alaserOdometry" name="alaserOdometry" ns="/aloam"/>
+    <node pkg="aloam_velodyne" type="alaserMapping" name="alaserMapping" ns="/aloam"/>
+    <node pkg="aloam_velodyne" type="alaserPGO" name="alaserPGO" ns="/aloam"/> <!-- SC-A-LOAM-->
 
-    <arg name="rviz" default="true" />
+    <arg name="rviz" default="false" />
     <group if="$(arg rviz)">
         <node launch-prefix="nice" pkg="rviz" type="rviz" name="sc_aloam_rviz" args="-d $(find aloam_velodyne)/rviz_cfg/aloam_velodyne.rviz" />
     </group>
