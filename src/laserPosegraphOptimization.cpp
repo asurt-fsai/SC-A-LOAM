@@ -131,7 +131,7 @@ double gpsAltitudeInitOffset = 0.0;
 double recentOptimizedX = 0.0;
 double recentOptimizedY = 0.0;
 
-ros::Publisher pubMapAftPGO, pubOdomAftPGO, pubPathAftPGO;
+// ros::Publisher pubMapAftPGO, pubOdomAftPGO, pubPathAftPGO;
 ros::Publisher pubLoopDetected;
 //ros::Publisher pubLoopScanLocal, pubLoopSubmapLocal;
 //ros::Publisher pubOdomRepubVerifier;
@@ -396,19 +396,19 @@ void pubPath( void )
         pathAftPGO.poses.push_back(poseStampAftPGO);
     }
     mKF.unlock(); 
-    pubOdomAftPGO.publish(odomAftPGO); // last pose 
-    pubPathAftPGO.publish(pathAftPGO); // poses 
+    // pubOdomAftPGO.publish(odomAftPGO); // last pose 
+    // pubPathAftPGO.publish(pathAftPGO); // poses 
 
-    static tf::TransformBroadcaster br;
-    tf::Transform transform;
-    tf::Quaternion q;
-    transform.setOrigin(tf::Vector3(odomAftPGO.pose.pose.position.x, odomAftPGO.pose.pose.position.y, odomAftPGO.pose.pose.position.z));
-    q.setW(odomAftPGO.pose.pose.orientation.w);
-    q.setX(odomAftPGO.pose.pose.orientation.x);
-    q.setY(odomAftPGO.pose.pose.orientation.y);
-    q.setZ(odomAftPGO.pose.pose.orientation.z);
-    transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, odomAftPGO.header.stamp, "aloam_map", "/aft_pgo"));
+    // static tf::TransformBroadcaster br;
+    // tf::Transform transform;
+    // tf::Quaternion q;
+    // transform.setOrigin(tf::Vector3(odomAftPGO.pose.pose.position.x, odomAftPGO.pose.pose.position.y, odomAftPGO.pose.pose.position.z));
+    // q.setW(odomAftPGO.pose.pose.orientation.w);
+    // q.setX(odomAftPGO.pose.pose.orientation.x);
+    // q.setY(odomAftPGO.pose.pose.orientation.y);
+    // q.setZ(odomAftPGO.pose.pose.orientation.z);
+    // transform.setRotation(q);
+    // br.sendTransform(tf::StampedTransform(transform, odomAftPGO.header.stamp, "aloam_map", "/aft_pgo"));
 } // pubPath
 
 void updatePoses(void)
@@ -839,10 +839,10 @@ void pubMap(void)
     downSizeFilterMapPGO.setInputCloud(laserCloudMapPGO);
     downSizeFilterMapPGO.filter(*laserCloudMapPGO);
 
-    sensor_msgs::PointCloud2 laserCloudMapPGOMsg;
-    pcl::toROSMsg(*laserCloudMapPGO, laserCloudMapPGOMsg);
-    laserCloudMapPGOMsg.header.frame_id = "aloam_map";
-    pubMapAftPGO.publish(laserCloudMapPGOMsg);
+    // sensor_msgs::PointCloud2 laserCloudMapPGOMsg;
+    // pcl::toROSMsg(*laserCloudMapPGO, laserCloudMapPGOMsg);
+    // laserCloudMapPGOMsg.header.frame_id = "aloam_map";
+    // pubMapAftPGO.publish(laserCloudMapPGOMsg);
 }
 
 void process_viz_map(void)
@@ -912,10 +912,10 @@ int main(int argc, char **argv)
 	ros::Subscriber subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("/aloam/aft_mapped_to_init", 100, laserOdometryHandler);
 	//ros::Subscriber subGPS = nh.subscribe<sensor_msgs::NavSatFix>("/gps/fix", 100, gpsHandler);
 
-	pubOdomAftPGO = nh.advertise<nav_msgs::Odometry>("/aloam/aft_pgo_odom", 100);
-	//pubOdomRepubVerifier = nh.advertise<nav_msgs::Odometry>("/repub_odom", 100);
-	pubPathAftPGO = nh.advertise<nav_msgs::Path>("/aloam/aft_pgo_path", 100);
-	pubMapAftPGO = nh.advertise<sensor_msgs::PointCloud2>("/aloam/aft_pgo_map", 100);
+	// pubOdomAftPGO = nh.advertise<nav_msgs::Odometry>("/aloam/aft_pgo_odom", 100);
+	// //pubOdomRepubVerifier = nh.advertise<nav_msgs::Odometry>("/repub_odom", 100);
+	// pubPathAftPGO = nh.advertise<nav_msgs::Path>("/aloam/aft_pgo_path", 100);
+	// pubMapAftPGO = nh.advertise<sensor_msgs::PointCloud2>("/aloam/aft_pgo_map", 100);
 
 
     
