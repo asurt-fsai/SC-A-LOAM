@@ -20,7 +20,7 @@
 
     <!--  -->
     <param name="/aloam/lidar_type" type="string" value="HDL32"/>
-    <param name="/aloam/lidar_topic" type="string" value="/velodyne_points_fixed"/>
+    <param name="/aloam/lidar_topic" type="string" value="/slam_manager/velodyne_points"/>
     <param name="/aloam/lidar_frame" type="string" value="/velodyne_fixed"/>
 
     <!-- utils -->
